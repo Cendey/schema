@@ -527,6 +527,7 @@ public class Resolver {
         Node source = edge.getSourceNode();
         Node target = edge.getTargetNode();
         if (result.getNode(target.getId()) == null) {
+//            result.nodeFactory().newInstance(target.getId(),result);
             Node parent = result.addNode(target.getId());
             target.getAttributeKeySet()
                 .forEach(key -> parent.addAttribute(key, target.<String>getAttribute(key)));
