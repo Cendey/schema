@@ -82,8 +82,7 @@ public class Scheme {
 
     //Literal for consistent reference
     public static final String HIKARI_PROPERTIES = "hikari.properties";
-    public static final String SLASH_HIKARI_PROPERTIES = "/hikari.properties";
-    public static final String DEPENDENCY = "Dependency";
+    public static final String OVER_VIEW = "overview";
     public static final String COMPONENT = "Component";
 
     //Travel Order
@@ -110,8 +109,8 @@ public class Scheme {
     public static final String TIME_DURATION_PROCESS = "This process spends [%02d min, %02d sec].";
 
     //System Properties
-    public static final String USER_DIR = "user.dir";
-    public static final String FILE_SEPARATOR = "file.separator";
+    private static final String USER_DIR = "user.dir";
+    private static final String FILE_SEPARATOR = "file.separator";
     public static final String UTF_8 = "UTF-8";
 
     //Node Access Status

@@ -28,6 +28,8 @@ import org.graphstream.graph.Graph;
 import org.graphstream.graph.GraphFactory;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.stream.file.FileSource;
+import org.graphstream.stream.file.FileSourceFactory;
 import org.graphstream.ui.view.Viewer;
 import org.graphstream.ui.view.ViewerListener;
 import org.graphstream.ui.view.ViewerPipe;
@@ -79,7 +81,7 @@ public class Resolver {
     private static final int HEIGHT_THRESHOLD = 3;
     private static final String SCRIPT_FILE_NAME = "clear_data_script.sql";
     private static final String GRAPH_FILE_NAME_PREFIX = "stream_graph_";
-    private static final String GRAPH_FILE_NAME_SUFFIX = ".dgs";
+    private static final String GRAPH_FILE_NAME_SUFFIX = ".gml";
     private static final String TABLES_TO_JSON_FILE_NAME = "tables.json";
     private static final String FOREIGN_TO_JSON_FILE_NAME = "foreign.json";
     private static final int FIXED_ROW_COUNT = 50;
@@ -149,7 +151,7 @@ public class Resolver {
                 List<Keys> lstFKRef = resolver.relationship(connection, FOREIGN_TO_JSON_FILE_NAME);
                 cache.put(Scheme.FOREIGN_KEYS, (ArrayList) lstFKRef);
 
-                Graph overview = resolver.overview(lstFKRef);
+                Graph overview = resolver.overview(lstFKRef, schemaName);
                 resolver.setRootNodeIds(Toolkit.resolveDisconnectedGraph(overview));
                 resolver.result(overview, schemaName);
             } catch (SQLException e) {
@@ -170,7 +172,7 @@ public class Resolver {
         throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         Future<Integer> status = executor.submit(genSQLScript(overview, schemaName));
-        Future<List<Graph>> graphs = executor.submit(graphs(overview));
+        Future<List<Graph>> graphs = executor.submit(graphs(overview, schemaName));
         try {
             System.out
                 .println(status.get() == 0 ? "Success to generate SQL script!" : "Failed to generate SQL script!");
@@ -180,7 +182,7 @@ public class Resolver {
                 graph -> {
                     executor.execute(persists(graph, schemaName, GRAPH_FILE_NAME_PREFIX));
 
-                    executor.execute(display(graph, schemaName));
+                    executor.execute(display(graph));
                 }
             );
         } catch (ExecutionException e) {
@@ -323,7 +325,7 @@ public class Resolver {
     }
 
 
-    private Runnable display(final Graph graph, String schemaName) {
+    private Runnable display(final Graph graph) {
         return () -> {
             Viewer viewer = graph.display();
             ViewerPipe pipe = viewer.newViewerPipe();
@@ -344,8 +346,7 @@ public class Resolver {
 
     private Runnable persists(Graph graph, String schemaName, String prefix) {
         return () -> {
-            String fileName =
-                schemaName.toLowerCase() + "_" + prefix + graph.getId() + GRAPH_FILE_NAME_SUFFIX;
+            String fileName = graftName(graph, schemaName, prefix);
             File target = new File(Scheme.WORK_DIR + fileName);
             if (!target.exists() || !target.isFile()) {
                 try {
@@ -355,6 +356,10 @@ public class Resolver {
                 }
             }
         };
+    }
+
+    private String graftName(Graph graph, String schemaName, String prefix) {
+        return schemaName.toLowerCase() + "_" + prefix + graph.getId().toLowerCase() + GRAPH_FILE_NAME_SUFFIX;
     }
 
     private void collect(List<Tables> lstTable) {
@@ -376,13 +381,33 @@ public class Resolver {
         return complement;
     }
 
-    private Graph overview(List<Keys> lstFKRef) {
+    private Graph overview(List<Keys> lstFKRef, String schemaName) {
         //Remember processed tables position which corresponding to position in the list of nodes
-        Graph overview = new GraphFactory().newInstance(Scheme.DEPENDENCY, SingleGraph.class.getName());
-        if (!CollectionUtils.isEmpty(lstFKRef)) {
-            lstFKRef.forEach(item -> build(overview, item));
+        Graph overview = new GraphFactory().newInstance(Scheme.OVER_VIEW, SingleGraph.class.getName());
+        String fileName = graftName(overview, schemaName, GRAPH_FILE_NAME_PREFIX);
+        File cache = new File(Scheme.WORK_DIR + fileName);
+        if (!cache.exists() || !cache.isFile() || !cache.canRead()) {
+            if (!CollectionUtils.isEmpty(lstFKRef)) {
+                lstFKRef.forEach(item -> build(overview, item));
+                new Thread(persists(overview, schemaName, GRAPH_FILE_NAME_PREFIX)).start();
+            }
+        } else {
+            readGraft(overview, fileName);
         }
         return overview;
+    }
+
+    private void readGraft(Graph overview, String fileName) {
+        try {
+            FileSource fs = FileSourceFactory.sourceFor(Scheme.WORK_DIR + fileName);
+            fs.addSink(overview);
+            fs.begin(fileName);
+            while (fs.nextEvents()) ;
+            fs.end();
+            fs.removeSink(overview);
+        } catch (IOException e) {
+            logger.error("Can't load graph files failed !\n" + e.getMessage());
+        }
     }
 
     private Callable<Integer> genSQLScript(final Graph graph, String schemaName) {
@@ -449,45 +474,54 @@ public class Resolver {
         Toolkit.addEdgeInfo(item, edge);
     }
 
-    private Callable<List<Graph>> graphs(final Graph graph) {
+    private Callable<List<Graph>> graphs(final Graph overview, String schemaName) {
         final List<Graph> graphs = new ArrayList<>();
         return () -> {
             rootNodeIds.forEach(rootId -> Arrays.stream(rootId.split("[|]")).filter(nodeId ->
-                Toolkit.height(graph.getNode(nodeId)) >= HEIGHT_THRESHOLD).findFirst()
-                .ifPresent(nodeId -> graph(graphs, graph.getNode(nodeId), nodeId)));
+                Toolkit.height(overview.getNode(nodeId)) >= HEIGHT_THRESHOLD).findFirst()
+                .ifPresent(nodeId -> graph(graphs, overview.getNode(nodeId), nodeId, schemaName)));
             return graphs;
         };
     }
 
-    private void graph(List<Graph> graphs, Node root, String rootId) {
+    private void graph(List<Graph> graphs, Node root, String rootId, String schemaName) {
         Graph result = new SingleGraph(StringUtils.remove(rootId, Scheme.NODE_PREFIX));
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
-        root.getBreadthFirstIterator(false)
-            .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
-                edge -> {
-                    Node source = edge.getSourceNode();
-                    Node target = edge.getTargetNode();
-                    if (result.getNode(target.getId()) == null) {
-                        Node parent = result.addNode(target.getId());
-                        target.getAttributeKeySet()
-                            .forEach(key -> parent.addAttribute(key, target.<String>getAttribute(key)));
+        File grafo = new File(Scheme.WORK_DIR + graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
+        if (!grafo.exists() || !grafo.isFile() || !grafo.canRead()) {
+            root.getBreadthFirstIterator(false)
+                .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
+                    edge -> {
+                        createGraft(result, edge);
                     }
-                    if (result.getNode(source.getId()) == null) {
-                        Node child = result.addNode(source.getId());
-                        source.getAttributeKeySet()
-                            .forEach(key -> child.addAttribute(key, source.<String>getAttribute(key)));
-                    }
-                    result.addEdge(edge.getId(), source.getId(), target.getId(), true);
-                    edge.getAttributeKeySet()
-                        .forEach(key -> result.getEdge(edge.getId())
-                            .addAttribute(key, edge.<String>getAttribute(key)));
-                }
-            ));
+                ));
+        } else {
+            readGraft(result, graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
+        }
         Toolkit.nodeSize(result, 1, 5);
         result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(rootId, Scheme.NODE_PREFIX));
         result.addAttribute(Scheme.UI_STYLESHEET, "url(css/polish.css)");
         graphs.add(result);
+    }
+
+    private void createGraft(Graph result, Edge edge) {
+        Node source = edge.getSourceNode();
+        Node target = edge.getTargetNode();
+        if (result.getNode(target.getId()) == null) {
+            Node parent = result.addNode(target.getId());
+            target.getAttributeKeySet()
+                .forEach(key -> parent.addAttribute(key, target.<String>getAttribute(key)));
+        }
+        if (result.getNode(source.getId()) == null) {
+            Node child = result.addNode(source.getId());
+            source.getAttributeKeySet()
+                .forEach(key -> child.addAttribute(key, source.<String>getAttribute(key)));
+        }
+        result.addEdge(edge.getId(), source.getId(), target.getId(), true);
+        edge.getAttributeKeySet()
+            .forEach(key -> result.getEdge(edge.getId())
+                .addAttribute(key, edge.<String>getAttribute(key)));
     }
 
     private int present(Graph graph, IRelevance<String, List<String>> item) {
