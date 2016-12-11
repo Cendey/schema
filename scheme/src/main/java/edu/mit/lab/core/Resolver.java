@@ -136,10 +136,8 @@ public class Resolver {
             cacheManager.init();
             Cache<String, ArrayList> cache = cacheManager.getCache("defaultCache", String.class, ArrayList.class);
             Resolver resolver = new Resolver();
-            String schemaName = null;
-            List<Keys> lstFKRef = null;
             try (Connection connection = createConnection()) {
-                schemaName = connection.getSchema();
+                String schemaName = connection.getSchema();
                 if (StringUtils.isEmpty(schemaName)) {
                     schemaName = connection.getCatalog();
                 }
@@ -148,15 +146,15 @@ public class Resolver {
                 List<Tables> lstTable = resolver.entities(connection, TABLES_TO_JSON_FILE_NAME);
                 cache.put(Scheme.TABLES, (ArrayList) lstTable);
                 resolver.collect(lstTable);
-                lstFKRef = resolver.relationship(connection, FOREIGN_TO_JSON_FILE_NAME);
+                List<Keys> lstFKRef = resolver.relationship(connection, FOREIGN_TO_JSON_FILE_NAME);
                 cache.put(Scheme.FOREIGN_KEYS, (ArrayList) lstFKRef);
+
+                Graph overview = resolver.overview(lstFKRef);
+                resolver.setRootNodeIds(Toolkit.resolveDisconnectedGraph(overview));
+                resolver.result(overview, schemaName);
             } catch (SQLException e) {
                 logger.error(e.getMessage());
             }
-            Graph overview = resolver.overview(lstFKRef);
-            resolver.setRootNodeIds(Toolkit.resolveDisconnectedGraph(overview));
-            resolver.result(overview, schemaName);
-
             long end = System.currentTimeMillis();
             long duration = end - start;
             System.out.println(String
@@ -182,7 +180,7 @@ public class Resolver {
                 graph -> {
                     executor.execute(persists(graph, schemaName, GRAPH_FILE_NAME_PREFIX));
 
-                    executor.execute(display(graph));
+                    executor.execute(display(graph, schemaName));
                 }
             );
         } catch (ExecutionException e) {
@@ -325,7 +323,7 @@ public class Resolver {
     }
 
 
-    private Runnable display(final Graph graph) {
+    private Runnable display(final Graph graph, String schemaName) {
         return () -> {
             Viewer viewer = graph.display();
             ViewerPipe pipe = viewer.newViewerPipe();
