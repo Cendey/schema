@@ -399,12 +399,29 @@ public class Resolver {
 
     private void readGraft(Graph overview, String fileName) {
         try {
-            FileSource fs = FileSourceFactory.sourceFor(Scheme.WORK_DIR + fileName);
+            String filePath = Scheme.WORK_DIR + fileName;
+            FileSource fs = FileSourceFactory.sourceFor(filePath);
+
             fs.addSink(overview);
-            fs.begin(fileName);
-            while (fs.nextEvents()) ;
-            fs.end();
-            fs.removeSink(overview);
+
+            try {
+                fs.begin(filePath);
+                overview.setStrict(false);
+                while (fs.nextEvents()) {
+                    // Optionally some code here ...
+                    // If the single graph has bi-direction edge, it will throw node rejection exceptions.
+                }
+            } catch (IOException e) {
+                logger.error(e.getMessage());
+            }
+
+            try {
+                fs.end();
+            } catch (IOException e) {
+                logger.error(e.getMessage());
+            } finally {
+                fs.removeSink(overview);
+            }
         } catch (IOException e) {
             logger.error("Can't load graph files failed !\n" + e.getMessage());
         }
@@ -485,7 +502,8 @@ public class Resolver {
     }
 
     private void graph(List<Graph> graphs, Node root, String rootId, String schemaName) {
-        Graph result = new SingleGraph(StringUtils.remove(rootId, Scheme.NODE_PREFIX));
+        Graph result =
+            new GraphFactory().newInstance(StringUtils.remove(rootId, Scheme.NODE_PREFIX), SingleGraph.class.getName());
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
         File grafo = new File(Scheme.WORK_DIR + graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
