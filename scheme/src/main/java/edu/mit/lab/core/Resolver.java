@@ -348,7 +348,7 @@ public class Resolver {
     private Runnable persists(Graph graph, String schemaName, String prefix) {
         return () -> {
             initDir();
-            String fileName = graftName(graph, schemaName, prefix);
+            String fileName = graphFileName(graph, schemaName, prefix);
             File target = new File(Scheme.WORK_DIR + fileName);
             if (!target.exists() || !target.isFile()) {
                 try {
@@ -369,7 +369,7 @@ public class Resolver {
         }
     }
 
-    private String graftName(Graph graph, String schemaName, String prefix) {
+    private String graphFileName(Graph graph, String schemaName, String prefix) {
         return schemaName.toLowerCase() + "_" + prefix + graph.getId().toLowerCase() + GRAPH_FILE_NAME_SUFFIX;
     }
 
@@ -395,7 +395,7 @@ public class Resolver {
     private Graph overview(List<Keys> lstFKRef, String schemaName) {
         //Remember processed tables position which corresponding to position in the list of nodes
         Graph overview = new GraphFactory().newInstance(Scheme.OVER_VIEW, SingleGraph.class.getName());
-        String fileName = graftName(overview, schemaName, GRAPH_FILE_NAME_PREFIX);
+        String fileName = graphFileName(overview, schemaName, GRAPH_FILE_NAME_PREFIX);
         File cache = new File(Scheme.WORK_DIR + fileName);
         if (!cache.exists() || !cache.isFile() || !cache.canRead()) {
             if (!CollectionUtils.isEmpty(lstFKRef)) {
@@ -403,12 +403,12 @@ public class Resolver {
                 new Thread(persists(overview, schemaName, GRAPH_FILE_NAME_PREFIX)).start();
             }
         } else {
-            readGraft(overview, fileName);
+            readGraphFile(overview, fileName);
         }
         return overview;
     }
 
-    private void readGraft(Graph overview, String fileName) {
+    private void readGraphFile(Graph overview, String fileName) {
         try {
             String filePath = Scheme.WORK_DIR + fileName;
             FileSource fs = FileSourceFactory.sourceFor(filePath);
@@ -517,7 +517,7 @@ public class Resolver {
             new GraphFactory().newInstance(StringUtils.remove(rootId, Scheme.NODE_PREFIX), SingleGraph.class.getName());
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
-        File grafo = new File(Scheme.WORK_DIR + graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
+        File grafo = new File(Scheme.WORK_DIR + graphFileName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
         if (!grafo.exists() || !grafo.isFile() || !grafo.canRead()) {
             root.getBreadthFirstIterator(false)
                 .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
@@ -526,7 +526,7 @@ public class Resolver {
                     }
                 ));
         } else {
-            readGraft(result, graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
+            readGraphFile(result, graphFileName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
         }
         Toolkit.nodeSize(result, 1, 5);
         result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(rootId, Scheme.NODE_PREFIX));
