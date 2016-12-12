@@ -257,6 +257,7 @@ public class Resolver {
     }
 
     private void persists(String contents, String fileName, String prefix) {
+        initDir();
         String schema = prefix.toLowerCase() + "_";
         File script = new File(Scheme.WORK_DIR + schema + fileName);
         if (!script.exists() || !script.isFile()) {
@@ -346,6 +347,7 @@ public class Resolver {
 
     private Runnable persists(Graph graph, String schemaName, String prefix) {
         return () -> {
+            initDir();
             String fileName = graftName(graph, schemaName, prefix);
             File target = new File(Scheme.WORK_DIR + fileName);
             if (!target.exists() || !target.isFile()) {
@@ -356,6 +358,15 @@ public class Resolver {
                 }
             }
         };
+    }
+
+    private void initDir() {
+        File directory = new File(Scheme.WORK_DIR);
+        if (!directory.exists() || !directory.isDirectory()) {
+            if (!directory.mkdirs()) {
+                logger.error("Create data collection directory failed!");
+            }
+        }
     }
 
     private String graftName(Graph graph, String schemaName, String prefix) {
