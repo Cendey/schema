@@ -541,20 +541,25 @@ public class Resolver {
     }
 
     private void createGraft(Graph result, Edge edge) {
-        Node source = edge.getSourceNode();
-        Node target = edge.getTargetNode();
-        if (result.getNode(target.getId()) == null) {
-//            result.nodeFactory().newInstance(target.getId(),result);
-            Node parent = result.addNode(target.getId());
-            target.getAttributeKeySet()
-                .forEach(key -> parent.addAttribute(key, target.<String>getAttribute(key)));
-        }
-        if (result.getNode(source.getId()) == null) {
-            Node child = result.addNode(source.getId());
-            source.getAttributeKeySet()
-                .forEach(key -> child.addAttribute(key, source.<String>getAttribute(key)));
-        }
         if (result.getEdge(edge.getId()) == null) {
+            Node source = edge.getSourceNode();
+            Node target = edge.getTargetNode();
+            if (result.getNode(target.getId()) == null) {
+//            result.nodeFactory().newInstance(target.getId(),result);
+                Node parent = result.addNode(target.getId());
+                target.getAttributeKeySet()
+                    .forEach(key -> parent.addAttribute(key, target.<String>getAttribute(key)));
+            }
+            if (result.getNode(source.getId()) == null) {
+                Node child = result.addNode(source.getId());
+                source.getAttributeKeySet()
+                    .forEach(key -> child.addAttribute(key, source.<String>getAttribute(key)));
+            }
+            result.addEdge(edge.getId(), source.getId(), target.getId(), true);
+            edge.getAttributeKeySet()
+                .forEach(key -> result.getEdge(edge.getId())
+                    .addAttribute(key, edge.<String>getAttribute(key)));
+
             result.addEdge(edge.getId(), source.getId(), target.getId(), true);
             edge.getAttributeKeySet()
                 .forEach(key -> result.getEdge(edge.getId())
