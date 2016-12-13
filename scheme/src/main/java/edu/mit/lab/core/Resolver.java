@@ -559,11 +559,6 @@ public class Resolver {
             edge.getAttributeKeySet()
                 .forEach(key -> result.getEdge(edge.getId())
                     .addAttribute(key, edge.<String>getAttribute(key)));
-
-            result.addEdge(edge.getId(), source.getId(), target.getId(), true);
-            edge.getAttributeKeySet()
-                .forEach(key -> result.getEdge(edge.getId())
-                    .addAttribute(key, edge.<String>getAttribute(key)));
         }
     }
 
