@@ -118,7 +118,7 @@ public class Scheme {
     public static final String MARKED = "marked";
     public static final List<String> STATUS = Collections.unmodifiableList(Arrays.asList(IDENTIFIED, MARKED));
 
-    public static final String WAREHOUSE = "warehouse";
+    private static final String WAREHOUSE = "warehouse";
     //Directory to store output data or files
     public static final String WORK_DIR =
         System.getProperty(Scheme.USER_DIR) + System.getProperty(Scheme.FILE_SEPARATOR) + WAREHOUSE + System

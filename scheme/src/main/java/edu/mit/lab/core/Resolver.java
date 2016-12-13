@@ -28,8 +28,6 @@ import org.graphstream.graph.Graph;
 import org.graphstream.graph.GraphFactory;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
-import org.graphstream.stream.file.FileSource;
-import org.graphstream.stream.file.FileSourceFactory;
 import org.graphstream.ui.view.Viewer;
 import org.graphstream.ui.view.ViewerListener;
 import org.graphstream.ui.view.ViewerPipe;
@@ -151,7 +149,7 @@ public class Resolver {
                 List<Keys> lstFKRef = resolver.relationship(connection, FOREIGN_TO_JSON_FILE_NAME);
                 cache.put(Scheme.FOREIGN_KEYS, (ArrayList) lstFKRef);
 
-                Graph overview = resolver.overview(lstFKRef, schemaName);
+                Graph overview = resolver.overview(lstFKRef);
                 resolver.setRootNodeIds(Toolkit.resolveDisconnectedGraph(overview));
                 resolver.result(overview, schemaName);
             } catch (SQLException e) {
@@ -172,7 +170,7 @@ public class Resolver {
         throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         Future<Integer> status = executor.submit(genSQLScript(overview, schemaName));
-        Future<List<Graph>> graphs = executor.submit(graphs(overview, schemaName));
+        Future<List<Graph>> graphs = executor.submit(graphs(overview));
         try {
             System.out
                 .println(status.get() == 0 ? "Success to generate SQL script!" : "Failed to generate SQL script!");
@@ -397,51 +395,15 @@ public class Resolver {
         return complement;
     }
 
-    private Graph overview(List<Keys> lstFKRef, String schemaName) {
+    private Graph overview(List<Keys> lstFKRef) {
         //Remember processed tables position which corresponding to position in the list of nodes
         Graph overview = new GraphFactory().newInstance(Scheme.OVER_VIEW, SingleGraph.class.getName());
-        String fileName = graphFileName(overview.getId(), schemaName, GRAPH_FILE_NAME_PREFIX);
-        File cache = new File(destDir(schemaName) + fileName);
-        if (!cache.exists() || !cache.isFile() || !cache.canRead()) {
-            if (!CollectionUtils.isEmpty(lstFKRef)) {
-                lstFKRef.forEach(item -> build(overview, item));
-                new Thread(persists(overview, schemaName, GRAPH_FILE_NAME_PREFIX)).start();
-            }
-        } else {
-            readGraft(overview, schemaName, fileName);
+        if (!CollectionUtils.isEmpty(lstFKRef)) {
+            lstFKRef.forEach(item -> build(overview, item));
         }
         return overview;
     }
 
-    private void readGraft(Graph overview, String schemaName, String fileName) {
-        try {
-            String filePath = destDir(schemaName) + fileName;
-            FileSource fs = FileSourceFactory.sourceFor(filePath);
-
-            fs.addSink(overview);
-
-            try {
-                fs.begin(filePath);
-                overview.setStrict(false);
-                while (fs.nextEvents()) {
-                    // Optionally some code here ...
-                    // If the single graph has bi-direction edge, it will throw node rejection exceptions.
-                }
-            } catch (IOException e) {
-                logger.error(e.getMessage());
-            }
-
-            try {
-                fs.end();
-            } catch (IOException e) {
-                logger.error(e.getMessage());
-            } finally {
-                fs.removeSink(overview);
-            }
-        } catch (IOException e) {
-            logger.error("Can't load graph files failed !\n" + e.getMessage());
-        }
-    }
 
     private Callable<Integer> genSQLScript(final Graph graph, String schemaName) {
         return () -> {
@@ -507,35 +469,29 @@ public class Resolver {
         Toolkit.addEdgeInfo(item, edge);
     }
 
-    private Callable<List<Graph>> graphs(final Graph overview, String schemaName) {
+    private Callable<List<Graph>> graphs(final Graph overview) {
         final List<Graph> graphs = new ArrayList<>();
         return () -> {
             rootNodeIds.forEach(rootId -> Arrays.stream(rootId.split("[|]")).filter(nodeId ->
                 Toolkit.height(overview.getNode(nodeId)) >= HEIGHT_THRESHOLD).findFirst()
-                .ifPresent(nodeId -> graph(graphs, overview.getNode(nodeId), nodeId, schemaName)));
+                .ifPresent(nodeId -> graph(graphs, overview.getNode(nodeId))));
             return graphs;
         };
     }
 
-    private void graph(List<Graph> graphs, Node root, String rootId, String schemaName) {
+    private void graph(List<Graph> graphs, Node root) {
         Graph result =
-            new GraphFactory().newInstance(StringUtils.remove(rootId, Scheme.NODE_PREFIX), SingleGraph.class.getName());
+            new GraphFactory().newInstance(StringUtils.remove(root.getId(), Scheme.NODE_PREFIX), SingleGraph.class.getName());
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
-        File graphFile =
-            new File(destDir(schemaName) + graphFileName(result.getId(), schemaName, GRAPH_FILE_NAME_PREFIX));
-        if (!graphFile.exists() || !graphFile.isFile() || !graphFile.canRead()) {
-            root.getBreadthFirstIterator(false)
-                .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
-                    edge -> {
-                        createGraft(result, edge);
-                    }
-                ));
-        } else {
-            readGraft(result, schemaName, graphFileName(result.getId(), schemaName, GRAPH_FILE_NAME_PREFIX));
-        }
+        root.getBreadthFirstIterator(false)
+            .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
+                edge -> {
+                    createGraft(result, edge);
+                }
+            ));
         Toolkit.nodeSize(result, 1, 5);
-        result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(rootId, Scheme.NODE_PREFIX));
+        result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(root.getId(), Scheme.NODE_PREFIX));
         result.addAttribute(Scheme.UI_STYLESHEET, "url(css/polish.css)");
         graphs.add(result);
     }
