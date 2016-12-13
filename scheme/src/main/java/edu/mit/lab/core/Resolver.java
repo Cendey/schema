@@ -108,7 +108,7 @@ public class Resolver {
     }
 
     /**
-     * <p>Summary:</p> <p>Collect all root node(s) id(s)</p>
+     * <p>Summary:</p><p>Collect all root node(s) id(s)</p>
      *
      * @param rootNodeIds <p>Sorted root node(s) id(s) by natural order</p>
      */
@@ -117,7 +117,7 @@ public class Resolver {
     }
 
     /**
-     * <p>Summary:</p> <p>Create database connection pool using Hikari</p>
+     * <p>Summary:</p><p>Create database connection pool using Hikari</p>
      *
      * @return <p>A database connection pool instance</p>
      */
