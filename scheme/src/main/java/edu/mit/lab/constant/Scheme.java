@@ -110,7 +110,7 @@ public class Scheme {
 
     //System Properties
     private static final String USER_DIR = "user.dir";
-    private static final String FILE_SEPARATOR = "file.separator";
+    public static final String FILE_SEPARATOR = "file.separator";
     public static final String UTF_8 = "UTF-8";
 
     //Node Access Status
@@ -118,9 +118,10 @@ public class Scheme {
     public static final String MARKED = "marked";
     public static final List<String> STATUS = Collections.unmodifiableList(Arrays.asList(IDENTIFIED, MARKED));
 
+    public static final String WAREHOUSE = "warehouse";
     //Directory to store output data or files
     public static final String WORK_DIR =
-        System.getProperty(Scheme.USER_DIR) + System.getProperty(Scheme.FILE_SEPARATOR) + "work" + System
+        System.getProperty(Scheme.USER_DIR) + System.getProperty(Scheme.FILE_SEPARATOR) + WAREHOUSE + System
             .getProperty(Scheme.FILE_SEPARATOR);
 
     public static final String DB_TYPE_ORACLE = "Oracle";

@@ -201,12 +201,10 @@ public class Resolver {
                 schemaName = connection.getCatalog();
             }
             String destFileName = schemaName.toLowerCase() + "_" + fileName;
-            File target = new File(Scheme.WORK_DIR + destFileName);
+            File target = new File(destDir(schemaName) + destFileName);
             if (target.exists() && target.isFile() && target.canRead()) {
                 try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(
-                        new FileInputStream(Scheme.WORK_DIR + destFileName),
-                        Charset.forName(Scheme.UTF_8).newDecoder()))) {
+                    new InputStreamReader(new FileInputStream(target), Charset.forName(Scheme.UTF_8).newDecoder()))) {
                     lstFKRef = genson.deserialize(reader, new GenericType<List<Keys>>() {
                     });
                 } catch (IOException e) {
@@ -233,11 +231,11 @@ public class Resolver {
                 schemaName = connection.getCatalog();
             }
             String destFileName = schemaName.toLowerCase() + "_" + fileName;
-            File target = new File(Scheme.WORK_DIR + destFileName);
+            String destDir = destDir(schemaName);
+            File target = new File(destDir + destFileName);
             if (target.exists() && target.isFile() && target.canRead()) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(Scheme.WORK_DIR + destFileName),
-                    Charset.forName(Scheme.UTF_8).newDecoder()))) {
+                try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(target), Charset.forName(Scheme.UTF_8).newDecoder()))) {
                     lstTable = genson.deserialize(reader, new GenericType<List<Tables>>() {
                     });
                 } catch (IOException e) {
@@ -257,12 +255,14 @@ public class Resolver {
     }
 
     private void persists(String contents, String fileName, String prefix) {
-        initDir();
+        initDir(prefix);
         String schema = prefix.toLowerCase() + "_";
-        File script = new File(Scheme.WORK_DIR + schema + fileName);
+        String destDir = destDir(prefix);
+        File script =
+            new File(destDir + schema + fileName);
         if (!script.exists() || !script.isFile()) {
             try (OutputStreamWriter writer = new OutputStreamWriter(
-                new FileOutputStream(Scheme.WORK_DIR + schema + fileName, false),
+                new FileOutputStream(destDir + schema + fileName, false),
                 Charset.forName(Scheme.UTF_8).newEncoder())) {
                 writer.write(contents);
                 writer.flush();
@@ -347,12 +347,13 @@ public class Resolver {
 
     private Runnable persists(Graph graph, String schemaName, String prefix) {
         return () -> {
-            initDir();
-            String fileName = graftName(graph, schemaName, prefix);
-            File target = new File(Scheme.WORK_DIR + fileName);
+            initDir(schemaName);
+            String fileName = graphFileName(graph.getId(), schemaName, prefix);
+            String destDir = destDir(schemaName);
+            File target = new File(destDir + fileName);
             if (!target.exists() || !target.isFile()) {
                 try {
-                    graph.write(Scheme.WORK_DIR + fileName);
+                    graph.write(destDir + fileName);
                 } catch (IOException e) {
                     logger.error(e.getMessage());
                 }
@@ -360,8 +361,12 @@ public class Resolver {
         };
     }
 
-    private void initDir() {
-        File directory = new File(Scheme.WORK_DIR);
+    private String destDir(String schemaName) {
+        return Scheme.WORK_DIR + schemaName + System.getProperty(Scheme.FILE_SEPARATOR);
+    }
+
+    private void initDir(String schemaName) {
+        File directory = new File(destDir(schemaName));
         if (!directory.exists() || !directory.isDirectory()) {
             if (!directory.mkdirs()) {
                 logger.error("Create data collection directory failed!");
@@ -369,8 +374,8 @@ public class Resolver {
         }
     }
 
-    private String graftName(Graph graph, String schemaName, String prefix) {
-        return schemaName.toLowerCase() + "_" + prefix + graph.getId().toLowerCase() + GRAPH_FILE_NAME_SUFFIX;
+    private String graphFileName(String id, String schemaName, String prefix) {
+        return schemaName.toLowerCase() + "_" + prefix + id.toLowerCase() + GRAPH_FILE_NAME_SUFFIX;
     }
 
     private void collect(List<Tables> lstTable) {
@@ -395,22 +400,22 @@ public class Resolver {
     private Graph overview(List<Keys> lstFKRef, String schemaName) {
         //Remember processed tables position which corresponding to position in the list of nodes
         Graph overview = new GraphFactory().newInstance(Scheme.OVER_VIEW, SingleGraph.class.getName());
-        String fileName = graftName(overview, schemaName, GRAPH_FILE_NAME_PREFIX);
-        File cache = new File(Scheme.WORK_DIR + fileName);
+        String fileName = graphFileName(overview.getId(), schemaName, GRAPH_FILE_NAME_PREFIX);
+        File cache = new File(destDir(schemaName) + fileName);
         if (!cache.exists() || !cache.isFile() || !cache.canRead()) {
             if (!CollectionUtils.isEmpty(lstFKRef)) {
                 lstFKRef.forEach(item -> build(overview, item));
                 new Thread(persists(overview, schemaName, GRAPH_FILE_NAME_PREFIX)).start();
             }
         } else {
-            readGraft(overview, fileName);
+            readGraft(overview, schemaName, fileName);
         }
         return overview;
     }
 
-    private void readGraft(Graph overview, String fileName) {
+    private void readGraft(Graph overview, String schemaName, String fileName) {
         try {
-            String filePath = Scheme.WORK_DIR + fileName;
+            String filePath = destDir(schemaName) + fileName;
             FileSource fs = FileSourceFactory.sourceFor(filePath);
 
             fs.addSink(overview);
@@ -441,7 +446,7 @@ public class Resolver {
     private Callable<Integer> genSQLScript(final Graph graph, String schemaName) {
         return () -> {
             String schema = schemaName.toLowerCase() + "_";
-            File sql = new File(Scheme.WORK_DIR + schema + SCRIPT_FILE_NAME);
+            File sql = new File(destDir(schemaName) + schema + SCRIPT_FILE_NAME);
             if (!sql.exists() || !sql.isFile()) {
                 Set<String> untouched = new TreeSet<>(tableIds);
                 rootNodeIds.forEach(
@@ -517,8 +522,9 @@ public class Resolver {
             new GraphFactory().newInstance(StringUtils.remove(rootId, Scheme.NODE_PREFIX), SingleGraph.class.getName());
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
-        File grafo = new File(Scheme.WORK_DIR + graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
-        if (!grafo.exists() || !grafo.isFile() || !grafo.canRead()) {
+        File graphFile =
+            new File(destDir(schemaName) + graphFileName(result.getId(), schemaName, GRAPH_FILE_NAME_PREFIX));
+        if (!graphFile.exists() || !graphFile.isFile() || !graphFile.canRead()) {
             root.getBreadthFirstIterator(false)
                 .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
                     edge -> {
@@ -526,7 +532,7 @@ public class Resolver {
                     }
                 ));
         } else {
-            readGraft(result, graftName(result, schemaName, GRAPH_FILE_NAME_PREFIX));
+            readGraft(result, schemaName, graphFileName(result.getId(), schemaName, GRAPH_FILE_NAME_PREFIX));
         }
         Toolkit.nodeSize(result, 1, 5);
         result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(rootId, Scheme.NODE_PREFIX));
@@ -548,10 +554,12 @@ public class Resolver {
             source.getAttributeKeySet()
                 .forEach(key -> child.addAttribute(key, source.<String>getAttribute(key)));
         }
-        result.addEdge(edge.getId(), source.getId(), target.getId(), true);
-        edge.getAttributeKeySet()
-            .forEach(key -> result.getEdge(edge.getId())
-                .addAttribute(key, edge.<String>getAttribute(key)));
+        if (result.getEdge(edge.getId()) == null) {
+            result.addEdge(edge.getId(), source.getId(), target.getId(), true);
+            edge.getAttributeKeySet()
+                .forEach(key -> result.getEdge(edge.getId())
+                    .addAttribute(key, edge.<String>getAttribute(key)));
+        }
     }
 
     private int present(Graph graph, IRelevance<String, List<String>> item) {
