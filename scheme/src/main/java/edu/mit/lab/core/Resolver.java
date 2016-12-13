@@ -107,10 +107,20 @@ public class Resolver {
         init();
     }
 
+    /**
+     * <p>Summary:</p> <p>Collect all root node(s) id(s)</p>
+     *
+     * @param rootNodeIds <p>Sorted root node(s) id(s) by natural order</p>
+     */
     private void setRootNodeIds(SortedSet<String> rootNodeIds) {
         this.rootNodeIds = rootNodeIds;
     }
 
+    /**
+     * <p>Summary:</p> <p>Create database connection pool using Hikari</p>
+     *
+     * @return <p>A database connection pool instance</p>
+     */
     private static Connection createConnection() {
         Connection connection = null;
         URL url = Thread.currentThread().getContextClassLoader().getResource("");
@@ -166,8 +176,14 @@ public class Resolver {
         }
     }
 
-    private void result(Graph overview, String schemaName)
-        throws InterruptedException {
+    /**
+     * <p>Summary:</p><p>Visualize database schema corresponding tables relationship in it</p>
+     *
+     * @param overview   <p>Include all table(s) node in multiple unconnected component(s) in a single graph.</p>
+     * @param schemaName <p>Database schema name</p>
+     * @throws InterruptedException <p>Refer to concurrent executor service</p>
+     */
+    private void result(Graph overview, String schemaName) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         Future<Integer> status = executor.submit(genSQLScript(overview, schemaName));
         Future<List<Graph>> graphs = executor.submit(graphs(overview));
@@ -190,6 +206,14 @@ public class Resolver {
         }
     }
 
+    /**
+     * <p>Summary:</p><p>Retrieve and process foreign key(s) reference among table(s),</p>
+     * <p>merge foreign keys if multiple ones referred by a foreign table</p>
+     *
+     * @param connection <p>Database connection pool</p>
+     * @param fileName   <p>Cached foreign key(s) JSON file, else the file does not exist</p>
+     * @return <p>All processed foreign key(s) information</p>
+     */
     private List<Keys> relationship(Connection connection, String fileName) {
         List<Keys> lstFKRef = null;
         Genson genson = new Genson();
@@ -220,6 +244,13 @@ public class Resolver {
         return lstFKRef;
     }
 
+    /**
+     * <p>Summary:</p><p>Retrieve all table(s) in given schema of a specified database.</p>
+     *
+     * @param connection <p>Database connection pool</p>
+     * @param fileName   <p>Cached table(s) JSON file, else the file does not exist</p>
+     * @return <p>All retrieve table(s)</p>
+     */
     private List<Tables> entities(Connection connection, String fileName) {
         List<Tables> lstTable = null;
         Genson genson = new Genson();
@@ -252,6 +283,13 @@ public class Resolver {
         return lstTable;
     }
 
+    /**
+     * <p>Summary:</p><p>Store the data to file as JSON format, to avoid load database schema corresponding information each time.</p>
+     *
+     * @param contents <p>Data stream</p>
+     * @param fileName <p>File name to write and keep in local file system</p>
+     * @param prefix   <p>Prefix of file name</p>
+     */
     private void persists(String contents, String fileName, String prefix) {
         initDir(prefix);
         String schema = prefix.toLowerCase() + "_";
@@ -324,6 +362,12 @@ public class Resolver {
     }
 
 
+    /**
+     * <p>Summary:</p><p>Display each graph, which is a single connected component.</p>
+     *
+     * @param graph <p>A graph, which will be displayed.</p>
+     * @return <p>A runnable implement lambda</p>
+     */
     private Runnable display(final Graph graph) {
         return () -> {
             Viewer viewer = graph.display();
@@ -343,6 +387,14 @@ public class Resolver {
         };
     }
 
+    /**
+     * <p>Summary:</p><p>Write each graph as .gml format to local file system</p>
+     *
+     * @param graph      <p>A single graph, which only include a connected component.</p>
+     * @param schemaName <p>Database schema or catalog.</p>
+     * @param prefix     <p>Prefix of a graph file name.</p>
+     * @return <p>A runnable implement by a lambda.</p>
+     */
     private Runnable persists(Graph graph, String schemaName, String prefix) {
         return () -> {
             initDir(schemaName);
@@ -359,10 +411,21 @@ public class Resolver {
         };
     }
 
+    /**
+     * <p>Summary:</p><p>The destination directory to keep files.</p>
+     *
+     * @param schemaName <p>Database schema or catalog as subdirectory.</p>
+     * @return <p>Destination directory.</p>
+     */
     private String destDir(String schemaName) {
         return Scheme.WORK_DIR + schemaName + System.getProperty(Scheme.FILE_SEPARATOR);
     }
 
+    /**
+     * <p>Summary:</p><p>Initialize destination directory, ignore it if the directory exists, otherwise make all directories.</p>
+     *
+     * @param schemaName <p>Database schema or catalog, using as subdirectory.</p>
+     */
     private void initDir(String schemaName) {
         File directory = new File(destDir(schemaName));
         if (!directory.exists() || !directory.isDirectory()) {
@@ -372,10 +435,23 @@ public class Resolver {
         }
     }
 
+    /**
+     * <p>Summary:</p><p>Construct a name of graph file.</p>
+     *
+     * @param id         <p>The identifier of a graph.</p>
+     * @param schemaName <p>Database schema or catalog, as a part of name of graph file.</p>
+     * @param prefix     <p>Prefix of a graph file name.</p>
+     * @return <p>A graph identifier's corresponding file name.</p>
+     */
     private String graphFileName(String id, String schemaName, String prefix) {
         return schemaName.toLowerCase() + "_" + prefix + id.toLowerCase() + GRAPH_FILE_NAME_SUFFIX;
     }
 
+    /**
+     * <p>Summary:</p><p>Collection all table(s) name.</p>
+     *
+     * @param lstTable <p>Table list</p>
+     */
     private void collect(List<Tables> lstTable) {
         lstTable.forEach(table -> tableIds.add(table.getTableName()));
     }
@@ -395,6 +471,12 @@ public class Resolver {
         return complement;
     }
 
+    /**
+     * <p>Summary:</p><p>Assemble a multiple connected components in a single graph by all foreign references.</p>
+     *
+     * @param lstFKRef <p>Foreign key(s) reference list</p>
+     * @return <p>A single graph with all foreign reference key(s).</p>
+     */
     private Graph overview(List<Keys> lstFKRef) {
         //Remember processed tables position which corresponding to position in the list of nodes
         Graph overview = new GraphFactory().newInstance(Scheme.OVER_VIEW, SingleGraph.class.getName());
@@ -405,6 +487,13 @@ public class Resolver {
     }
 
 
+    /**
+     * <p>Summary:</p><p>Generate SQL script by traversal a graph with post-order.</p>
+     *
+     * @param graph      <p>A single graph with all foreign references relationship.</p>
+     * @param schemaName <p>Database schema or catalog.</p>
+     * @return <p>A indicator: <code>0</code>,success to generate SQL script file; otherwise failed.</p>
+     */
     private Callable<Integer> genSQLScript(final Graph graph, String schemaName) {
         return () -> {
             String schema = schemaName.toLowerCase() + "_";
@@ -441,6 +530,12 @@ public class Resolver {
         };
     }
 
+    /**
+     * <p>Summary:</p><p>Build a single graph with all foreign reference keys.</p>
+     *
+     * @param graph <p>A single graph, possibly include more than one connected components.</p>
+     * @param item  <p>Each foreign reference key information.</p>
+     */
     private void build(Graph graph, IRelevance<String, List<String>> item) {
         String targetNodeId = Scheme.NODE_PREFIX + item.to();
         String sourceNodeId = Scheme.NODE_PREFIX + item.from();
@@ -469,34 +564,53 @@ public class Resolver {
         Toolkit.addEdgeInfo(item, edge);
     }
 
+    /**
+     * <p>Summary:</p><p>If there are amount of less than 2 depth graph(s), filter to display which can avoid CPU overhead usage and promote response performance.</p>
+     *
+     * @param overview <p>A single graph with all foreign reference key(s).</p>
+     * @return <p>The filtered graph(s) to display.</p>
+     */
     private Callable<List<Graph>> graphs(final Graph overview) {
         final List<Graph> graphs = new ArrayList<>();
         return () -> {
             rootNodeIds.forEach(rootId -> Arrays.stream(rootId.split("[|]")).filter(nodeId ->
                 Toolkit.height(overview.getNode(nodeId)) >= HEIGHT_THRESHOLD).findFirst()
-                .ifPresent(nodeId -> graph(graphs, overview.getNode(nodeId))));
+                .ifPresent(nodeId -> graphs.add(graph(overview.getNode(nodeId)))));
             return graphs;
         };
     }
 
-    private void graph(List<Graph> graphs, Node root) {
+    /**
+     * <p>Summary:</p><p>Assemble each graph which depth is filtered and need to display</p>
+     *
+     * @param root <p>A root node</p>
+     * @return <p>A single graph which only contains a connected component.</p>
+     */
+    private Graph graph(Node root) {
         Graph result =
-            new GraphFactory().newInstance(StringUtils.remove(root.getId(), Scheme.NODE_PREFIX), SingleGraph.class.getName());
+            new GraphFactory()
+                .newInstance(StringUtils.remove(root.getId(), Scheme.NODE_PREFIX), SingleGraph.class.getName());
         result.addAttribute(Scheme.UI_QUALITY);
         result.addAttribute(Scheme.UI_ANTIALIAS);
         root.getBreadthFirstIterator(false)
             .forEachRemaining(currentNode -> currentNode.getEnteringEdgeSet().forEach(
                 edge -> {
-                    createGraft(result, edge);
+                    assembleGraph(result, edge);
                 }
             ));
         Toolkit.nodeSize(result, 1, 5);
         result.addAttribute(Scheme.UI_DEFAULT_TITLE, StringUtils.remove(root.getId(), Scheme.NODE_PREFIX));
         result.addAttribute(Scheme.UI_STYLESHEET, "url(css/polish.css)");
-        graphs.add(result);
+        return result;
     }
 
-    private void createGraft(Graph result, Edge edge) {
+    /**
+     * <p>Summary:</p><p>Assemble a single graph with only one connected component.</p>
+     *
+     * @param result <p>A single graph is about to  be assembled</p>
+     * @param edge   <p>A existed single graph's edge.</p>
+     */
+    private void assembleGraph(Graph result, Edge edge) {
         if (result.getEdge(edge.getId()) == null) {
             Node source = edge.getSourceNode();
             Node target = edge.getTargetNode();
@@ -518,6 +632,13 @@ public class Resolver {
         }
     }
 
+    /**
+     * <p>Summary:</p><p>Determine whether current edge related two nodes are existing or not.</p>
+     *
+     * @param graph <p>A single graph.</p>
+     * @param item  <p>Foreign reference information, include primary table, foreign table, foreign keys and etc.</p>
+     * @return <p>A present status.</p>
+     */
     private int present(Graph graph, IRelevance<String, List<String>> item) {
         String targetId = Scheme.NODE_PREFIX + item.to();
         String sourceId = Scheme.NODE_PREFIX + item.from();
@@ -526,6 +647,13 @@ public class Resolver {
         return target | source;
     }
 
+    /**
+     * <p>Summary:</p><p>Retrieve all schema entities' type, which are {<code>Table</code>,<code>View</code>,etc.}</p>
+     *
+     * @param connection <p>A database connection pool instance.</p>
+     * @return <p>Entities type list.</p>
+     * @throws SQLException <p>SQL exception while retrieve those information.</p>
+     */
     private List<String> processEntityType(Connection connection) throws SQLException {
         List<String> lstEntityTypes = new ArrayList<>();
         ResultSet types = connection.getMetaData().getTableTypes();
@@ -536,6 +664,12 @@ public class Resolver {
         return lstEntityTypes;
     }
 
+    /**
+     * <p>Summary:</p><p>Retrieve tables and map it to an object</p>
+     *
+     * @param connection <p>A database connection pool instance.</p>
+     * @return <p>Table list</p>
+     */
     private List<Tables> processTable(Connection connection) {
         List<Tables> lstTable = new ArrayList<>();
         try (ResultSet tables =
@@ -581,6 +715,14 @@ public class Resolver {
         return processKeysInfo(connection, true);
     }
 
+    /**
+     * <p>Summary:</p><p>Handle each foreign reference key information.</p>
+     *
+     * @param result     <p>Foreign reference key information result set.</p>
+     * @param lstRefKeys <p>Foreign reference key list</p>
+     * @param mapIds     <p>Processed foreign key(s) set.</p>
+     * @throws SQLException <p>SQL exception while process foreign reference key result set.</p>
+     */
     private void handleRefKeys(ResultSet result, List<Keys> lstRefKeys, Map<String, Integer> mapIds)
         throws SQLException {
         while (result.next()) {
@@ -609,6 +751,13 @@ public class Resolver {
         return processKeysInfo(connection, false);
     }
 
+    /**
+     * <p>Summary:</p><p>Pagination query to retrieve foreign reference keys information.</p>
+     *
+     * @param connection    <p>A database connection pool instance.</p>
+     * @param forExportKeys <p><code>true</code>, export keys request; otherwise <code>false</code>.</p>
+     * @return <p>All foreign reference key(s) list.</p>
+     */
     private List<Keys> processKeysInfo(Connection connection, boolean forExportKeys) {
         List<Keys> lstRefKeys = new ArrayList<>();
         try {
