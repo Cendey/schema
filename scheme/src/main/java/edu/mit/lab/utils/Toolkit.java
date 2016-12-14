@@ -39,8 +39,8 @@ import java.util.regex.Pattern;
 public class Toolkit {
 
     private static final String EXCLUDED_PATTERN =
-        "^(?:FM|[CV](?=TRF)|VC|CC|SY|IFM|MSG|WORK(?=(FLOW|_EFFORT))|STRUCTURE|WF)\\w+|\\w+(?:ACCESS|SET(?:UP|TING)|TEMPLATE)$";
-    public static final Pattern INSTANCE = Pattern.compile(EXCLUDED_PATTERN);
+        "^(?:FM|[CV]TRF|[VC]C|SY|IFM|MSG|WORK(?:FLOW|_EFFORT)|STRUCTURE|WF)\\w*|\\w*(?<!JOB)(?:ACCESS|SET(?:UP|TING)|TEMPLATE)$";
+    public static final Pattern FILTER = Pattern.compile(EXCLUDED_PATTERN);
 
     private static <T> void processNode(Graph graph, TreeNode<T> node) {
         String nodeId = Scheme.NODE_PREFIX + String.valueOf(node.data());
@@ -201,7 +201,7 @@ public class Toolkit {
 
     private static void perform(Node root, Collection<String> tableIds, StringBuilder script) {
         String tableName = StringUtils.removeFirst(root.getId(), Scheme.NODE_PREFIX);
-        boolean exclusive = INSTANCE.matcher(tableName).matches();
+        boolean exclusive = FILTER.matcher(tableName).matches();
         String format = (exclusive ? "--" : "") + "delete from  %s;\r\n";
         script.append(String.format(format, StringUtils.lowerCase(tableName)));
         root.addAttribute(Scheme.ACTION_MARKED, Scheme.IDENTIFIED);

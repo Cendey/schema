@@ -462,7 +462,7 @@ public class Resolver {
     private StringBuilder genAuditLogScript() {
         StringBuilder complement = new StringBuilder(Scheme.STD_SQL_COMMENTS_BOILERPLATE_FOR_AUDIT_LOG_TABLES);
         tableIds.forEach(item -> {
-            boolean exclusive = Toolkit.INSTANCE.matcher(item).matches();
+            boolean exclusive = Toolkit.FILTER.matcher(item).matches();
             complement.append(String
                 .format(
                     (exclusive ? "--" : "") + Scheme.STD_SQL_DELETE_STATEMENT,
@@ -514,7 +514,7 @@ public class Resolver {
 
                 script.append(Scheme.STD_SQL_COMMENTS_BOILERPLATE_FOR_INDEPENDENT_TABLES);
                 untouched.forEach(item -> {
-                    boolean exclusive = Toolkit.INSTANCE.matcher(item).matches();
+                    boolean exclusive = Toolkit.FILTER.matcher(item).matches();
                     script.append(
                         String.format(
                             (exclusive ? "--" : "") + Scheme.STD_SQL_DELETE_STATEMENT,
